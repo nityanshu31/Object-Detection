@@ -4,10 +4,16 @@ from gradio_client import Client, handle_file
 import shutil
 import os
 
+from dotenv import load_dotenv
+
+# Load environment variables from .env file
+load_dotenv()
+HF_TOKEN = os.getenv("HF_TOKEN")
+
 app = FastAPI()
 
-# Initialize Gradio client once
-gr_client = Client("GanymedeNil/Qwen2-VL-7B")
+# Initialize Gradio client with Hugging Face token
+gr_client = Client("GanymedeNil/Qwen2-VL-7B", hf_token=HF_TOKEN)
 
 @app.post("/analyze-image/")
 async def analyze_image(file: UploadFile = File(...)):
@@ -17,7 +23,7 @@ async def analyze_image(file: UploadFile = File(...)):
         with open(file_location, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
 
-        # Send to Gradio Space
+        # Call the Hugging Face model
         result = gr_client.predict(
             image=handle_file(file_location),
             text_input=None,
