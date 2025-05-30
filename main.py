@@ -1,41 +1,34 @@
 from fastapi import FastAPI, File, UploadFile
-from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from gradio_client import Client, handle_file
 import shutil
 import os
 
 app = FastAPI()
 
-# Allow all origins for testing
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+# Initialize Gradio client once
+gr_client = Client("GanymedeNil/Qwen2-VL-7B")
 
-client = Client("1aurent/cogvlm_captionner")
-
-@app.post("/generate-caption")
-async def generate_caption(file: UploadFile = File(...)):
-    file_location = f"./temp_{file.filename}"
-    
-    # Save the uploaded image
-    with open(file_location, "wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
-
+@app.post("/analyze-image/")
+async def analyze_image(file: UploadFile = File(...)):
     try:
-        # Use handle_file on the saved local path
-        result = client.predict(
+        # Save the uploaded file to disk
+        file_location = f"temp_{file.filename}"
+        with open(file_location, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+
+        # Send to Gradio Space
+        result = gr_client.predict(
             image=handle_file(file_location),
-            query="Provide a factual description of this image in up to two paragraphs. Include details on objects, background, scenery, interactions, gestures, poses, and any visible text content. Specify the number of repeated objects. Describe the dominant colors, color contrasts, textures, and materials. Mention the composition, including the arrangement of elements and focus points. Note the camera angle or perspective, and provide any identifiable contextual information. Include details on the style, lighting, and shadows. Avoid subjective interpretations or speculation.",
-            api_name="/generate_caption"
+            text_input=None,
+            model_id="Qwen/Qwen2-VL-7B-Instruct",
+            api_name="/run_example"
         )
-    except Exception as e:
-        return {"error": str(e)}
-    finally:
-        # Optional: cleanup temp file
+
+        # Clean up local file
         os.remove(file_location)
 
-    return {"caption": result}
+        return JSONResponse(content={"result": result})
+    
+    except Exception as e:
+        return JSONResponse(content={"error": str(e)}, status_code=500)
